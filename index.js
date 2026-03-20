@@ -2,9 +2,14 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 canvas.width = 1024;
 canvas.height = 576;
-
 const TILE_SIZE = 48;
 const offset = { x: -750, y: -600 };
+const keys = {
+  w: { pressed: false },
+  a: { pressed: false },
+  s: { pressed: false },
+  d: { pressed: false },
+};
 
 // --- CLASES ---
 class Boundary {
@@ -91,6 +96,10 @@ const collisions2D = [];
 for (let i = 0; i < collisionMap.length; i += MAP_WIDTH) {
   collisions2D.push(collisionMap.slice(i, i + MAP_WIDTH));
 }
+const battleZoneMap = [];
+for (let i = 0; i < battleZonesData.length; i += MAP_WIDTH) {
+  battleZoneMap.push(battleZonesData.slice(i, i + MAP_WIDTH));
+}
 
 const boundaries = [];
 collisions2D.forEach((row, i) => {
@@ -109,8 +118,25 @@ collisions2D.forEach((row, i) => {
   });
 });
 
+const battleZonesBoundaries = [];
+battleZoneMap.forEach((row, i) => {
+  row.forEach((symbol, j) => {
+    if (symbol === 1025) {
+      // Tu valor de zona de batalla
+      battleZonesBoundaries.push(
+        new Boundary({
+          position: {
+            x: j * TILE_SIZE + offset.x,
+            y: i * TILE_SIZE + offset.y,
+          },
+        }),
+      );
+    }
+  });
+});
+
 // Importante: Actualiza la lista de movables después de crear las boundaries
-const movables = [background, ...boundaries];
+const movables = [background, ...boundaries, ...battleZonesBoundaries];
 
 // --- LÓGICA DE COLISIÓN ---
 function checkCollision({ rect1, rect2 }) {
@@ -125,12 +151,6 @@ function checkCollision({ rect1, rect2 }) {
   );
 }
 
-const keys = {
-  w: { pressed: false },
-  a: { pressed: false },
-  s: { pressed: false },
-  d: { pressed: false },
-};
 
 // --- BUCLE PRINCIPAL ---
 function animate() {
@@ -139,6 +159,7 @@ function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   background.draw();
   boundaries.forEach((b) => b.draw());
+  battleZonesBoundaries.forEach((b) => b.draw());
   player.draw();
 
   player.moving = false;
@@ -196,6 +217,20 @@ function animate() {
         })
       ) {
         movingHorizontal = false;
+        break;
+      }
+    }
+    for (let b of battleZonesBoundaries) {
+      if (
+        checkCollision({
+          rect1: player,
+          rect2: {
+            ...b,
+            position: { x: b.position.x + hSpeed, y: b.position.y },
+          },
+        })
+      ) {
+        console.log("¡Entraste en una zona de batalla!");
         break;
       }
     }
