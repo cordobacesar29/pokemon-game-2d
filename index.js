@@ -151,6 +151,20 @@ function checkCollision({ rect1, rect2 }) {
   );
 }
 
+// --- FUNCIÓN AUXILIAR PARA ÁREA DE SOLAPAMIENTO ---
+function getOverlappingArea(rect1, rect2) {
+  const overlapX = Math.max(
+    0,
+    Math.min(rect1.position.x + rect1.width, rect2.position.x + rect2.width) -
+      Math.max(rect1.position.x, rect2.position.x),
+  );
+  const overlapY = Math.max(
+    0,
+    Math.min(rect1.position.y + rect1.height, rect2.position.y + rect2.height) -
+      Math.max(rect1.position.y, rect2.position.y),
+  );
+  return overlapX * overlapY;
+}
 
 // --- BUCLE PRINCIPAL ---
 function animate() {
@@ -159,18 +173,37 @@ function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   background.draw();
   boundaries.forEach((b) => b.draw());
-  battleZonesBoundaries.forEach((b) => b.draw());
+  battleZonesBoundaries.forEach((b) => b.draw()); // Solo para debug
   player.draw();
 
+  let moving = false;
   player.moving = false;
+
+  // --- DETECCIÓN DE ZONAS DE BATALLA ---
+  // Se dispara solo si el jugador se está moviendo
+  if (keys.w.pressed || keys.a.pressed || keys.s.pressed || keys.d.pressed) {
+    for (let b of battleZonesBoundaries) {
+      const area = getOverlappingArea(player, b);
+
+      // Si el jugador pisa más de la mitad de su tamaño en la zona
+      if (area > (player.width * player.height) / 2) {
+        // Aquí podrías agregar un factor aleatorio para que no sea instantáneo
+        if (Math.random() < 0.02) {
+          // 2% de probabilidad por frame de movimiento
+          console.log("¡Iniciando Batalla!");
+          // Aquí activarías el estado de batalla y detendrías la animación
+        }
+        break;
+      }
+    }
+  }
+
   const speed = 3;
 
   // --- LÓGICA EJE VERTICAL (W / S) ---
   if (keys.w.pressed || keys.s.pressed) {
     player.moving = true;
     let movingVertical = true;
-
-    // Determinar dirección y sprite
     const vSpeed = keys.w.pressed ? speed : -speed;
     player.image = keys.w.pressed ? player.sprites.up : player.sprites.down;
 
@@ -192,14 +225,11 @@ function animate() {
   }
 
   // --- LÓGICA EJE HORIZONTAL (A / D) ---
-  // Usamos un IF independiente, NO un "else if"
   if (keys.a.pressed || keys.d.pressed) {
     player.moving = true;
     let movingHorizontal = true;
-
     const hSpeed = keys.a.pressed ? speed : -speed;
-    // Solo cambiamos el sprite a lateral si no se está presionando arriba/abajo
-    // o si prefieres que la vista lateral tenga prioridad, quita el 'if' de abajo
+
     if (!keys.w.pressed && !keys.s.pressed) {
       player.image = keys.a.pressed
         ? player.sprites.left
@@ -217,20 +247,6 @@ function animate() {
         })
       ) {
         movingHorizontal = false;
-        break;
-      }
-    }
-    for (let b of battleZonesBoundaries) {
-      if (
-        checkCollision({
-          rect1: player,
-          rect2: {
-            ...b,
-            position: { x: b.position.x + hSpeed, y: b.position.y },
-          },
-        })
-      ) {
-        console.log("¡Entraste en una zona de batalla!");
         break;
       }
     }
