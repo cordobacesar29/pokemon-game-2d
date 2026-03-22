@@ -166,6 +166,11 @@ function getOverlappingArea(rect1, rect2) {
   return overlapX * overlapY;
 }
 
+const battle = {
+  initiated: false,
+
+}
+
 // --- BUCLE PRINCIPAL ---
 function animate() {
   globalThis.requestAnimationFrame(animate);
@@ -175,9 +180,15 @@ function animate() {
   boundaries.forEach((b) => b.draw());
   battleZonesBoundaries.forEach((b) => b.draw()); // Solo para debug
   player.draw();
-
+  
   let moving = false;
   player.moving = false;
+
+  if(battle.initiated) {
+    // Aquí iría la lógica de la batalla (animaciones, turnos, etc.)
+    return; // Salimos del bucle de movimiento mientras la batalla está activa
+  }
+
 
   // --- DETECCIÓN DE ZONAS DE BATALLA ---
   // Se dispara solo si el jugador se está moviendo
@@ -191,6 +202,7 @@ function animate() {
         if (Math.random() < 0.02) {
           // 2% de probabilidad por frame de movimiento
           console.log("¡Iniciando Batalla!");
+
           // Aquí activarías el estado de batalla y detendrías la animación
         }
         break;
