@@ -1,7 +1,9 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+
 canvas.width = 1024;
 canvas.height = 576;
+
 const TILE_SIZE = 48;
 const offset = { x: -750, y: -600 };
 const keys = {
@@ -10,7 +12,6 @@ const keys = {
   s: { pressed: false },
   d: { pressed: false },
 };
-
 // --- CLASES ---
 class Boundary {
   constructor({ position }) {
@@ -168,42 +169,63 @@ function getOverlappingArea(rect1, rect2) {
 
 const battle = {
   initiated: false,
-
-}
+};
 
 // --- BUCLE PRINCIPAL ---
 function animate() {
-  globalThis.requestAnimationFrame(animate);
+  const animationId = globalThis.requestAnimationFrame(animate);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   background.draw();
   boundaries.forEach((b) => b.draw());
   battleZonesBoundaries.forEach((b) => b.draw()); // Solo para debug
   player.draw();
-  
+
   let moving = false;
   player.moving = false;
 
-  if(battle.initiated) {
+  if (battle.initiated) {
     // Aquí iría la lógica de la batalla (animaciones, turnos, etc.)
     return; // Salimos del bucle de movimiento mientras la batalla está activa
   }
 
-
   // --- DETECCIÓN DE ZONAS DE BATALLA ---
   // Se dispara solo si el jugador se está moviendo
   if (keys.w.pressed || keys.a.pressed || keys.s.pressed || keys.d.pressed) {
+    player.moving = true;
     for (let b of battleZonesBoundaries) {
       const area = getOverlappingArea(player, b);
 
       // Si el jugador pisa más de la mitad de su tamaño en la zona
       if (area > (player.width * player.height) / 2) {
-        // Aquí podrías agregar un factor aleatorio para que no sea instantáneo
+        // 2% de probabilidad por frame de movimiento
         if (Math.random() < 0.02) {
-          // 2% de probabilidad por frame de movimiento
-          console.log("¡Iniciando Batalla!");
-
+          // deactivate the current animation loop
+          globalThis.cancelAnimationFrame(animationId);
           // Aquí activarías el estado de batalla y detendrías la animación
+          battle.initiated = true;
+          gsap.to("#overlappingDiv", {
+            opacity: 1,
+            repeat: 3,
+            yoyo: true,
+            duration: 0.4,
+            onComplete() {
+              // Aquí podrías iniciar la batalla (mostrar menú, etc.)
+              gsap.to("#overlappingDiv", {
+                opacity: 1,
+                duration: 0.4,
+                onComplete() {
+                  animateBattle();
+                  gsap.to("#overlappingDiv", {
+                    opacity: 1,
+                    duration: 0.4,
+                  });
+                },
+              });
+              // activate a new animation loop
+              animateBattle();
+            },
+          });
         }
         break;
       }
@@ -214,7 +236,6 @@ function animate() {
 
   // --- LÓGICA EJE VERTICAL (W / S) ---
   if (keys.w.pressed || keys.s.pressed) {
-    player.moving = true;
     let movingVertical = true;
     const vSpeed = keys.w.pressed ? speed : -speed;
     player.image = keys.w.pressed ? player.sprites.up : player.sprites.down;
@@ -238,7 +259,6 @@ function animate() {
 
   // --- LÓGICA EJE HORIZONTAL (A / D) ---
   if (keys.a.pressed || keys.d.pressed) {
-    player.moving = true;
     let movingHorizontal = true;
     const hSpeed = keys.a.pressed ? speed : -speed;
 
@@ -267,6 +287,18 @@ function animate() {
 }
 
 animate();
+const battleBackgroundImage = new Image();
+battleBackgroundImage.src = "./img/battleBackground.png";
+const battleBackgroundSprite = new Sprite({
+  position: { x: 0, y: 0 },
+  image: battleBackgroundImage,
+});
+
+function animateBattle() {
+  // Aquí iría la lógica de animación de la batalla (fondo, personajes, etc.)
+  window.requestAnimationFrame(animateBattle);
+  battleBackgroundSprite.draw();
+}
 
 // --- EVENT LISTENERS ---
 globalThis.addEventListener("keydown", (e) => {
