@@ -26,7 +26,14 @@ class Boundary {
 }
 
 class Sprite {
-  constructor({ position, image, frames = { max: 1 }, sprites }) {
+  constructor({
+    position,
+    image,
+    frames = { max: 1, hold: 10 },
+    sprites,
+    animate = false,
+    velocity,
+  }) {
     this.position = position;
     this.image = image;
     this.frames = { ...frames, val: 0, elapsed: 0 };
@@ -34,7 +41,7 @@ class Sprite {
       this.width = this.image.width / this.frames.max;
       this.height = this.image.height;
     };
-    this.moving = false;
+    this.animate = animate;
     this.sprites = sprites;
   }
 
@@ -51,13 +58,13 @@ class Sprite {
       this.image.height,
     );
 
-    if (!this.moving) return;
+    if (!this.animate) return;
 
     if (this.frames.max > 1) {
       this.frames.elapsed++;
     }
 
-    if (this.frames.elapsed % 10 === 0) {
+    if (this.frames.elapsed % this.frames.hold === 0) {
       if (this.frames.val < this.frames.max - 1) this.frames.val++;
       else this.frames.val = 0;
     }
@@ -83,7 +90,7 @@ const player = new Sprite({
     y: canvas.height / 2 - 68 / 2,
   },
   image: pDown,
-  frames: { max: 4 },
+  frames: { max: 4, hold: 10 },
   sprites: { up: pUp, down: pDown, left: pLeft, right: pRight },
 });
 
@@ -182,7 +189,7 @@ function animate() {
   player.draw();
 
   let moving = false;
-  player.moving = false;
+  player.animate = false;
 
   if (battle.initiated) {
     // Aquí iría la lógica de la batalla (animaciones, turnos, etc.)
@@ -192,7 +199,7 @@ function animate() {
   // --- DETECCIÓN DE ZONAS DE BATALLA ---
   // Se dispara solo si el jugador se está moviendo
   if (keys.w.pressed || keys.a.pressed || keys.s.pressed || keys.d.pressed) {
-    player.moving = true;
+    player.animate = true;
     for (let b of battleZonesBoundaries) {
       const area = getOverlappingArea(player, b);
 
@@ -217,7 +224,7 @@ function animate() {
                 onComplete() {
                   animateBattle();
                   gsap.to("#overlappingDiv", {
-                    opacity: 1,
+                    opacity: 0,
                     duration: 0.4,
                   });
                 },
@@ -294,10 +301,20 @@ const battleBackgroundSprite = new Sprite({
   image: battleBackgroundImage,
 });
 
+const draggleBackgroundImage = new Image();
+draggleBackgroundImage.src = "./img/draggleSprite.png";
+const draggle = new Sprite({
+  position: { x: 800, y: 100 },
+  image: draggleBackgroundImage,
+  frames: { max: 4, hold: 30 },
+  animate: true,
+});
+
 function animateBattle() {
   // Aquí iría la lógica de animación de la batalla (fondo, personajes, etc.)
-  window.requestAnimationFrame(animateBattle);
+  globalThis.requestAnimationFrame(animateBattle);
   battleBackgroundSprite.draw();
+  draggle.draw();
 }
 
 // --- EVENT LISTENERS ---
