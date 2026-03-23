@@ -309,14 +309,23 @@ const draggle = new Sprite({
   frames: { max: 4, hold: 30 },
   animate: true,
 });
+const embyBackgroundImage = new Image();
+embyBackgroundImage.src = "./img/embySprite.png";
+const emby = new Sprite({
+  position: { x: 280, y: 325 },
+  image: embyBackgroundImage,
+  frames: { max: 4, hold: 30 },
+  animate: true,
+});
 
 function animateBattle() {
   // Aquí iría la lógica de animación de la batalla (fondo, personajes, etc.)
   globalThis.requestAnimationFrame(animateBattle);
   battleBackgroundSprite.draw();
   draggle.draw();
+  emby.draw();
 }
-
+animateBattle();
 // --- EVENT LISTENERS ---
 globalThis.addEventListener("keydown", (e) => {
   switch (e.key) {
