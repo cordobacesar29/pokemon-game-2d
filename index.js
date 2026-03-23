@@ -12,6 +12,7 @@ const keys = {
   s: { pressed: false },
   d: { pressed: false },
 };
+
 // --- CLASES ---
 class Boundary {
   constructor({ position }) {
@@ -32,17 +33,27 @@ class Sprite {
     frames = { max: 1, hold: 10 },
     sprites,
     animate = false,
-    velocity,
+    isEnemy = false,
+    health = 100,
   }) {
     this.position = position;
     this.image = image;
     this.frames = { ...frames, val: 0, elapsed: 0 };
-    this.image.onload = () => {
+    this.health = health;
+
+    if (this.image.complete) {
       this.width = this.image.width / this.frames.max;
       this.height = this.image.height;
-    };
+    } else {
+      this.image.onload = () => {
+        this.width = this.image.width / this.frames.max;
+        this.height = this.image.height;
+      };
+    }
+
     this.animate = animate;
     this.sprites = sprites;
+    this.isEnemy = isEnemy;
   }
 
   draw() {
@@ -67,6 +78,104 @@ class Sprite {
     if (this.frames.elapsed % this.frames.hold === 0) {
       if (this.frames.val < this.frames.max - 1) this.frames.val++;
       else this.frames.val = 0;
+    }
+  }
+
+  attack({ attack, recipient, renderedSprites }) {
+    const damage = Math.floor(Math.random() * attack.damage) + 1;
+    recipient.health = Math.max(0, recipient.health - damage);
+
+    let healthBar = recipient.isEnemy ? "#draggleHealth" : "#embyHealth";
+
+    switch (attack.name) {
+      case "Fireball": {
+        const fireballImage = new Image();
+        fireballImage.src = "./img/fireball.png";
+        const fireball = new Sprite({
+          position: { x: this.position.x, y: this.position.y },
+          image: fireballImage,
+          frames: { max: 4, hold: 10 },
+          animate: true,
+        });
+        renderedSprites.splice(1, 0, fireball);
+
+        gsap.to(fireball.position, {
+          x: recipient.position.x,
+          y: recipient.position.y,
+          onComplete: () => {
+            gsap.to(healthBar, {
+              width: recipient.health + "%",
+            });
+
+            gsap.to(recipient.position, {
+              x: recipient.position.x + 10,
+              yoyo: true,
+              repeat: 5,
+              duration: 0.08,
+            });
+
+            gsap.to(recipient, {
+              opacity: 0,
+              repeat: 5,
+              yoyo: true,
+              duration: 0.08,
+              onComplete: () => {
+                recipient.opacity = 1;
+
+                if (recipient.health <= 0) {
+                  endBattle(recipient, renderedSprites);
+                }
+              },
+            });
+            renderedSprites.splice(1, 1);
+          },
+        });
+        break;
+      }
+      case "Tackle": {
+        const tl = gsap.timeline();
+
+        let movementDistance = 20;
+        if (this.isEnemy) movementDistance = -20;
+
+        tl.to(this.position, {
+          x: this.position.x - movementDistance,
+        })
+          .to(this.position, {
+            x: this.position.x + movementDistance * 2,
+            duration: 0.1,
+            onComplete: () => {
+              gsap.to(healthBar, {
+                width: recipient.health + "%",
+              });
+
+              gsap.to(recipient.position, {
+                x: recipient.position.x + 10,
+                yoyo: true,
+                repeat: 5,
+                duration: 0.08,
+              });
+
+              gsap.to(recipient, {
+                opacity: 0,
+                repeat: 5,
+                yoyo: true,
+                duration: 0.08,
+                onComplete: () => {
+                  recipient.opacity = 1;
+
+                  if (recipient.health <= 0) {
+                    endBattle(recipient, renderedSprites);
+                  }
+                },
+              });
+            },
+          })
+          .to(this.position, {
+            x: this.position.x,
+          });
+        break;
+      }
     }
   }
 }
@@ -99,7 +208,7 @@ const background = new Sprite({
   image: bgImg,
 });
 
-const MAP_WIDTH = 70; // Ajusta este número al ancho de tu mapa en tiles
+const MAP_WIDTH = 70;
 const collisions2D = [];
 for (let i = 0; i < collisionMap.length; i += MAP_WIDTH) {
   collisions2D.push(collisionMap.slice(i, i + MAP_WIDTH));
@@ -113,7 +222,6 @@ const boundaries = [];
 collisions2D.forEach((row, i) => {
   row.forEach((symbol, j) => {
     if (symbol === 1025) {
-      // Tu valor de colisión
       boundaries.push(
         new Boundary({
           position: {
@@ -130,7 +238,6 @@ const battleZonesBoundaries = [];
 battleZoneMap.forEach((row, i) => {
   row.forEach((symbol, j) => {
     if (symbol === 1025) {
-      // Tu valor de zona de batalla
       battleZonesBoundaries.push(
         new Boundary({
           position: {
@@ -143,13 +250,10 @@ battleZoneMap.forEach((row, i) => {
   });
 });
 
-// Importante: Actualiza la lista de movables después de crear las boundaries
 const movables = [background, ...boundaries, ...battleZonesBoundaries];
 
 // --- LÓGICA DE COLISIÓN ---
 function checkCollision({ rect1, rect2 }) {
-  // Reducimos un poco la hitbox del jugador para que no sea un bloque exacto
-  // Esto permite que el personaje "entre" un poco en los tiles (efecto 2.5D)
   const padding = 4;
   return (
     rect1.position.x + rect1.width - padding >= rect2.position.x &&
@@ -159,7 +263,6 @@ function checkCollision({ rect1, rect2 }) {
   );
 }
 
-// --- FUNCIÓN AUXILIAR PARA ÁREA DE SOLAPAMIENTO ---
 function getOverlappingArea(rect1, rect2) {
   const overlapX = Math.max(
     0,
@@ -178,70 +281,70 @@ const battle = {
   initiated: false,
 };
 
-// --- BUCLE PRINCIPAL ---
+let animationId;
+
+// --- BUCLE PRINCIPAL (MUNDO LIBRE) ---
 function animate() {
-  const animationId = globalThis.requestAnimationFrame(animate);
+  animationId = globalThis.requestAnimationFrame(animate);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   background.draw();
   boundaries.forEach((b) => b.draw());
-  battleZonesBoundaries.forEach((b) => b.draw()); // Solo para debug
+  battleZonesBoundaries.forEach((b) => b.draw());
   player.draw();
 
-  let moving = false;
   player.animate = false;
 
-  if (battle.initiated) {
-    // Aquí iría la lógica de la batalla (animaciones, turnos, etc.)
-    return; // Salimos del bucle de movimiento mientras la batalla está activa
-  }
+  if (battle.initiated) return; // Si empezó la batalla, frenamos el movimiento
 
-  // --- DETECCIÓN DE ZONAS DE BATALLA ---
-  // Se dispara solo si el jugador se está moviendo
   if (keys.w.pressed || keys.a.pressed || keys.s.pressed || keys.d.pressed) {
     player.animate = true;
+
     for (let b of battleZonesBoundaries) {
       const area = getOverlappingArea(player, b);
 
-      // Si el jugador pisa más de la mitad de su tamaño en la zona
       if (area > (player.width * player.height) / 2) {
-        // 2% de probabilidad por frame de movimiento
         if (Math.random() < 0.02) {
-          // deactivate the current animation loop
+          battle.initiated = true; // Activar batalla antes de cancelar el frame
           globalThis.cancelAnimationFrame(animationId);
-          // Aquí activarías el estado de batalla y detendrías la animación
-          battle.initiated = true;
+
           gsap.to("#overlappingDiv", {
             opacity: 1,
             repeat: 3,
             yoyo: true,
             duration: 0.4,
             onComplete() {
-              // Aquí podrías iniciar la batalla (mostrar menú, etc.)
               gsap.to("#overlappingDiv", {
                 opacity: 1,
                 duration: 0.4,
                 onComplete() {
+                  // Mostrar Menú de Ataques
+                  document.querySelector("#topHealthBar").style.display =
+                    "block";
+                  document.querySelector("#bottomHealthBar").style.display =
+                    "block";
+                  document.querySelector("#barAttackInterface").style.display =
+                    "flex";
+
+                  // Iniciar Batalla
                   animateBattle();
+
                   gsap.to("#overlappingDiv", {
                     opacity: 0,
                     duration: 0.4,
                   });
                 },
               });
-              // activate a new animation loop
-              animateBattle();
             },
           });
+          break;
         }
-        break;
       }
     }
   }
 
   const speed = 3;
 
-  // --- LÓGICA EJE VERTICAL (W / S) ---
   if (keys.w.pressed || keys.s.pressed) {
     let movingVertical = true;
     const vSpeed = keys.w.pressed ? speed : -speed;
@@ -264,7 +367,6 @@ function animate() {
     if (movingVertical) movables.forEach((m) => (m.position.y += vSpeed));
   }
 
-  // --- LÓGICA EJE HORIZONTAL (A / D) ---
   if (keys.a.pressed || keys.d.pressed) {
     let movingHorizontal = true;
     const hSpeed = keys.a.pressed ? speed : -speed;
@@ -293,7 +395,6 @@ function animate() {
   }
 }
 
-animate();
 const battleBackgroundImage = new Image();
 battleBackgroundImage.src = "./img/battleBackground.png";
 const battleBackgroundSprite = new Sprite({
@@ -308,7 +409,9 @@ const draggle = new Sprite({
   image: draggleBackgroundImage,
   frames: { max: 4, hold: 30 },
   animate: true,
+  isEnemy: true,
 });
+
 const embyBackgroundImage = new Image();
 embyBackgroundImage.src = "./img/embySprite.png";
 const emby = new Sprite({
@@ -318,15 +421,74 @@ const emby = new Sprite({
   animate: true,
 });
 
+const renderedSprites = [battleBackgroundSprite, draggle, emby];
+
+let battleAnimationId; // Nuevo: Para controlar el loop de batalla
 function animateBattle() {
-  // Aquí iría la lógica de animación de la batalla (fondo, personajes, etc.)
-  globalThis.requestAnimationFrame(animateBattle);
-  battleBackgroundSprite.draw();
-  draggle.draw();
-  emby.draw();
+  battleAnimationId = globalThis.requestAnimationFrame(animateBattle);
+
+  renderedSprites.forEach((sprite) => {
+    sprite.draw();
+  });
 }
-animateBattle();
-// --- EVENT LISTENERS ---
+
+// 🔥 Nueva Función: Para cerrar batalla limpiamente
+function endBattle(recipient, renderedSprites) {
+  gsap.to(recipient.position, {
+    y: recipient.position.y + 100,
+    duration: 0.5,
+  });
+
+  gsap.to(recipient, {
+    opacity: 0,
+    duration: 0.5,
+    onComplete: () => {
+      gsap.to("#overlappingDiv", {
+        opacity: 1,
+        duration: 0.5,
+        onComplete: () => {
+          // Frenar la animación de batalla y prender el mapa
+          globalThis.cancelAnimationFrame(battleAnimationId);
+          battle.initiated = false;
+          
+          document.querySelector("#topHealthBar").style.display = "none";
+          document.querySelector("#bottomHealthBar").style.display = "none";
+          document.querySelector("#barAttackInterface").style.display = "none";
+
+          recipient.health = 100;
+          recipient.position.y -= 100;
+
+          const draggleBar = document.querySelector("#draggleHealth");
+          if (draggleBar) draggleBar.style.width = "100%";
+
+          animate(); // Volvemos al mundo libre!
+
+          gsap.to("#overlappingDiv", {
+            opacity: 0,
+            duration: 0.5,
+          });
+        },
+      });
+    },
+  });
+}
+
+document.querySelector("#attack1").addEventListener("click", () => {
+  emby.attack({
+    attack: { name: "Tackle", damage: 10 },
+    recipient: draggle,
+    renderedSprites: renderedSprites,
+  });
+});
+
+document.querySelector("#attack2").addEventListener("click", () => {
+  emby.attack({
+    attack: { name: "Fireball", damage: 25 },
+    recipient: draggle,
+    renderedSprites: renderedSprites,
+  });
+});
+
 globalThis.addEventListener("keydown", (e) => {
   switch (e.key) {
     case "w":
@@ -368,3 +530,6 @@ globalThis.addEventListener("keyup", (e) => {
       break;
   }
 });
+
+// Iniciamos UNICAMENTE el mapa
+animate();
