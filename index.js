@@ -432,7 +432,6 @@ function animateBattle() {
   });
 }
 
-// 🔥 Nueva Función: Para cerrar batalla limpiamente
 function endBattle(recipient, renderedSprites) {
   gsap.to(recipient.position, {
     y: recipient.position.y + 100,
@@ -447,8 +446,13 @@ function endBattle(recipient, renderedSprites) {
         opacity: 1,
         duration: 0.5,
         onComplete: () => {
-          // Frenar la animación de batalla y prender el mapa
+          // 1. Frenar la animación de batalla
           globalThis.cancelAnimationFrame(battleAnimationId);
+          
+          // 2. IMPORTANTE: Limpiar el ID del bucle principal antes de reiniciarlo
+          // Esto evita que se acumulen múltiples llamadas a animate()
+          globalThis.cancelAnimationFrame(animationId); 
+
           battle.initiated = false;
           
           document.querySelector("#topHealthBar").style.display = "none";
@@ -461,7 +465,8 @@ function endBattle(recipient, renderedSprites) {
           const draggleBar = document.querySelector("#draggleHealth");
           if (draggleBar) draggleBar.style.width = "100%";
 
-          animate(); // Volvemos al mundo libre!
+          // 3. Reiniciar el bucle de forma limpia
+          animate(); 
 
           gsap.to("#overlappingDiv", {
             opacity: 0,
